@@ -1,26 +1,40 @@
-vmo-callcenter-os/                # Raíz de tu repositorio
-│
-├── app.py                        # Punto de entrada (Menú principal y Home)
-├── requirements.txt              # Librerías necesarias (streamlit, pandas, duckdb, etc.)
-├── README.md                     # Instrucciones para que otros lo instalen
-│
-├── .streamlit/                   # Configuración visual de Streamlit
-│   └── config.toml               # (Para colores corporativos, ocultar menús, etc.)
-│
-├── data/                         # La "Memoria Central"
-│   ├── mock_data/                # Archivos CSV de prueba para quien lo descargue
-│   └── vmo_database.db           # Tu base de datos local (SQLite o DuckDB)
-│
-├── pages/                        # FRONT-END: El estándar de Streamlit para Multi-Páginas
-│   ├── 1_🧠_CORTEX_Ingesta.py
-│   ├── 2_⚙️_NEXUS_Capacidad.py
-│   ├── 3_🔥_FORGE_Ejecucion.py
-│   ├── 4_🛡️_SENTINEL_Calidad.py
-│   └── ... (las 9 fases)
-│
-└── agentes/                      # BACK-END: El "Cerebro" de cada módulo
-    ├── __init__.py
-    ├── cortex_validador.py       # Lógica de limpieza y guardado en DB
-    ├── nexus_forecasting.py      # Fórmulas de Erlang C, cruces de capacidad
-    ├── sentinel_qa.py            # Lógica de detección de errores RAC
-    └── utils.py                  # Funciones comunes (ej. conexión a la DB, control de "Datos de Ejemplo")
+# VMO Call Center OS 🏢
+
+Este es un ecosistema integral de gestión para **Vendor Management Offices (VMO)** y operaciones de Call Center. El sistema permite gestionar el ciclo de vida completo de una operación BPO, desde la ingesta de datos crudos hasta la toma de decisiones estratégicas.
+
+La aplicación está construida con **Python** y **Streamlit**, diseñada para ser modular, escalable y fácil de usar.
+
+---
+
+## 🚀 Cómo empezar
+
+Cualquiera puede usar este sistema de dos formas:
+
+1. **Datos de Ejemplo:** Dentro del módulo **CORTEX**, puedes generar datos ficticios para probar todos los flujos del sistema de inmediato.
+2. **Tus Datos:** Puedes cargar tus propios archivos `.csv` respetando las columnas requeridas en cada sección.
+
+---
+
+## 🔄 El Ciclo de Gestión (9 Fases)
+
+El sistema se divide en 9 agentes que se alimentan entre sí:
+
+1. **CORTEX (Datos):** Ingesta, documentación y validación de fuentes (ACD, QA, CX).
+2. **NEXUS (Capacidad):** Cálculo de carga de trabajo, TMO y staffing necesario.
+3. **FORGE (Ejecución):** Gestión Intraday (GTR), adherencia y alertas de desvío.
+4. **SENTINEL (Calidad):** Monitoreo de KPIs de calidad y detección de errores críticos (RAC).
+5. **PULSE (Experiencia):** Análisis de sentimiento y satisfacción del cliente (CSAT).
+6. **BLUEPRINT (Procesos):** Diseño y control de cambios en los PCRCs operativos.
+7. **LEDGER (Financiero):** Cálculo de facturación, bonos por desempeño y penalidades.
+8. **ATLAS (Estrategia):** Consolidación ejecutiva para comités WBR y MBR.
+9. **RUICA (Mejora):** Registro de acciones correctivas y actualización de la base de conocimiento.
+
+---
+
+## 🛠️ Instalación Local
+
+Si prefieres correrlo en tu máquina:
+
+1. Clona el repositorio:
+   ```bash
+   git clone [https://github.com/tu-usuario/vmo-callcenter-os.git](https://github.com/tu-usuario/vmo-callcenter-os.git)
