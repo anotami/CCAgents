@@ -1,71 +1,77 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import plotly.express as px
 
 st.set_page_config(page_title="NEXUS | Capacidad", layout="wide")
 
-# Banner de estado persistente
+# Banner de estado
 if st.session_state.get('usando_datos_ejemplo', True):
     st.markdown("<h1 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>Datos de Ejemplo</h1>", unsafe_allow_html=True)
 else:
     st.markdown("<h1 style='text-align: center; color: #00cc66; background-color: #e6ffe6; padding: 10px; border-radius: 5px;'>Tus Datos</h1>", unsafe_allow_html=True)
 
-st.title("⚙️ NEXUS: Dimensionamiento y Capacidad")
+st.title("NEXUS: Dimensionamiento y Capacidad")
 
 # Recuperar datos de CORTEX
 df_acd = st.session_state.get('data_acd')
 
 if df_acd is not None:
-    # Asegurar formato de fecha
+    # Preparacion de datos
     df_acd['fecha'] = pd.to_datetime(df_acd['fecha'])
     
-    # --- FILTROS LATERALES ---
-    st.sidebar.header("Filtros de Análisis")
+    # --- SELECCION DE PCRC (ARRIBA) ---
+    pcrcs = ["Todos"] + list(df_acd['pcrc'].unique())
+    pcrc_sel = st.selectbox("Seleccione el PCRC a analizar:", pcrcs)
     
-    # Filtro por PCRC
-    lista_pcrc = ["Todos"] + list(df_acd['pcrc'].unique())
-    pcrc_seleccionado = st.sidebar.selectbox("Selecciona PCRC", lista_pcrc)
-    
-    # Aplicar Filtro
-    if pcrc_seleccionado != "Todos":
-        df_filtrado = df_acd[df_acd['pcrc'] == pcrc_seleccionado].copy()
+    if pcrc_sel != "Todos":
+        df = df_acd[df_acd['pcrc'] == pcrc_sel].copy()
     else:
-        df_filtrado = df_acd.copy()
-
-    # 1. KPIs de Capacidad Segmentados
-    total_lls = len(df_filtrado)
-    tmo_avg = df_filtrado['tmo_segundos'].mean()
-    abandono_pct = (df_filtrado['abandono'].sum() / total_lls) * 100 if total_lls > 0 else 0
-    
-    st.subheader(f"Análisis para: {pcrc_seleccionado}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Volumen", f"{total_lls} lls")
-    c2.metric("TMO Promedio", f"{int(tmo_avg)} seg")
-    c3.metric("Abandono", f"{abandono_pct:.1f}%")
+        df = df_acd.copy()
 
     st.divider()
 
-    # 2. Distribución de Carga Horaria
+    # --- FILAS DE GRAFICAS ---
+    # Fila 1: Mensual y Semanal
+    col1, col2 = st.columns(2)
     
-    st.subheader("Curva de Arribo por Hora")
-    df_filtrado['hora'] = df_filtrado['fecha'].dt.hour
-    chart_data = df_filtrado.groupby('hora').size()
-    st.area_chart(chart_data)
+    with col1:
+        st.subheader("Vista Mensual")
+        df_mensual = df.resample('M', on='fecha').size().reset_index(name='Llamadas')
+        df_mensual['Mes'] = df_mensual['fecha'].dt.strftime('%b %Y')
+        fig_mes = px.bar(df_mensual, x='Mes', y='Llamadas', color_discrete_sequence=['#1f77b4'])
+        st.plotly_chart(fig_mes, use_container_width=True)
 
-    # 3. Cálculo de Staffing (Carga de Trabajo)
-    st.subheader("Carga de Trabajo (Workload)")
-    workload_hrs = (total_lls * tmo_avg) / 3600
+    with col2:
+        st.subheader("Vista Semanal")
+        df_semanal = df.resample('W', on='fecha').size().reset_index(name='Llamadas')
+        df_semanal['Semana'] = df_semanal['fecha'].dt.strftime('Sem %U')
+        fig_sem = px.line(df_semanal, x='Semana', y='Llamadas', markers=True)
+        st.plotly_chart(fig_sem, use_container_width=True)
+
+    # Fila 2: Diaria e Intervalo
+    col3, col4 = st.columns(2)
     
-    st.info(f"Para el PCRC **{pcrc_seleccionado}**, se requiere cubrir un total de **{workload_hrs:.1f} horas** netas de atención.")
+    with col3:
+        st.subheader("Vista Diaria (Ultimos 30 dias)")
+        df_diario = df.resample('D', on='fecha').size().reset_index(name='Llamadas')
+        fig_dia = px.area(df_diario.tail(30), x='fecha', y='Llamadas')
+        st.plotly_chart(fig_dia, use_container_width=True)
+
+    with col4:
+        st.subheader("Distribucion por Intervalo (Hora)")
+        # Agrupamos por hora del dia para ver el comportamiento promedio del intervalo
+        df['Hora'] = df['fecha'].dt.hour
+        df_intervalo = df.groupby('Hora').size().reset_index(name='Llamadas')
+        fig_int = px.bar(df_intervalo, x='Hora', y='Llamadas', color='Llamadas', color_continuous_scale='Viridis')
+        st.plotly_chart(fig_int, use_container_width=True)
+
+    # --- ANALISIS DE CARGA ---
+    st.divider()
+    tmo_avg = df['tmo_segundos'].mean()
+    workload_total = (len(df) * tmo_avg) / 3600
     
-    # Tabla resumen por Site dentro del PCRC seleccionado
-    st.write("Distribución por Site:")
-    resumen_site = df_filtrado.groupby('site').agg({
-        'id_llamada': 'count',
-        'tmo_segundos': 'mean'
-    }).rename(columns={'id_llamada': 'Llamadas', 'tmo_segundos': 'TMO Avg'})
-    st.dataframe(resumen_site, use_container_width=True)
+    st.info(f"Analisis Final: Para el PCRC {pcrc_sel}, el volumen procesado representa {workload_total:.1f} horas de conexion neta con un TMO promedio de {int(tmo_avg)} segundos.")
 
 else:
-    st.warning("No hay datos cargados. Por favor, ve a CORTEX y genera el ecosistema de 2 meses.")
-    if st.button("Ir a CORTEX"):
-        st.switch_page("pages/1_CORTEX.py")
+    st.warning("No hay datos cargados. Por favor, ve a CORTEX y genera el entorno de 2 meses.")
