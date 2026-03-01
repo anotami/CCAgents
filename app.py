@@ -1,43 +1,34 @@
 import streamlit as st
 
-# 1. Configuración de página (SIEMPRE debe ser la primera línea de Streamlit)
+# 1. Configuracion de pagina
 st.set_page_config(
     page_title="VMO Call Center OS",
-    page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. Control de Entorno: Lógica central para los datos
-# Por ahora lo definimos aquí, luego lo podemos conectar a un botón en la barra lateral
-usando_datos_ejemplo = True 
+# 2. Control de Entorno Global (PERSISTENTE)
+if 'usando_datos_ejemplo' not in st.session_state:
+    st.session_state.usando_datos_ejemplo = True
 
-# Alerta visual estandarizada en la parte superior
-if usando_datos_ejemplo:
-    st.markdown("<h2 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>DATOS DE EJEMPLO</h2>", unsafe_allow_html=True)
+# Banner visual segun el estado de los datos
+if st.session_state.usando_datos_ejemplo:
+    st.markdown("<h1 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>Datos de Ejemplo</h1>", unsafe_allow_html=True)
 else:
-    st.markdown("<h2 style='text-align: center; color: #00cc66; background-color: #e6ffe6; padding: 10px; border-radius: 5px;'>TUS DATOS</h2>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #00cc66; background-color: #e6ffe6; padding: 10px; border-radius: 5px;'>Tus Datos</h1>", unsafe_allow_html=True)
 
 st.write("---")
 
-# 3. Contenido de la página de inicio
-st.title("Sistema de Gestión VMO 🏢")
+# 3. Contenido de la pagina de inicio
+st.title("Sistema de Gestion VMO")
 st.markdown("""
-Bienvenido al ecosistema integral de gestión de Call Centers y BPOs. 
-Este sistema está diseñado en 9 fases modulares que se alimentan entre sí.
+Bienvenido al ecosistema integral de gestion de Call Centers. 
+Este sistema funciona en ciclos de 9 fases.
 
-👈 **Para comenzar, selecciona un módulo en el menú lateral izquierdo.**
-
-### Flujo del Ecosistema:
-1. 🧠 **CORTEX:** Ingesta y validación de datos (ACD, CRM, QA).
-2. ⚙️ **NEXUS:** Dimensionamiento y cálculo de capacidad.
-3. 🔥 **FORGE:** GTR Intraday y ejecución.
-4. 🛡️ **SENTINEL:** Calidad, monitoreo y detección de errores.
-5. 💓 **PULSE:** Medición de la experiencia (CX/CSAT).
-6. 📐 **BLUEPRINT:** Diseño y reingeniería de procesos.
-7. 💰 **LEDGER:** Control económico y facturación.
-8. 🧭 **ATLAS:** Estrategia y consolidación ejecutiva.
-9. ↻ **RUICA:** Mejora continua.
+Usa el menu lateral para navegar entre los agentes.
 """)
 
-st.info("💡 **Tip:** Asegúrate de subir los archivos base en CORTEX antes de operar los demás módulos.")
+# Selector de modo para pruebas (esto ayuda a cambiar el banner)
+if st.checkbox("Activar modo 'Mis Datos'"):
+    st.session_state.usando_datos_ejemplo = False
+    st.rerun()
