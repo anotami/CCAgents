@@ -1,61 +1,92 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
 
-st.set_page_config(page_title="FORGE | Ejecución", layout="wide")
+st.set_page_config(page_title="FORGE | GTR", layout="wide")
 
-# Banner de estado persistente
+# Banner de estado
 if st.session_state.get('usando_datos_ejemplo', True):
     st.markdown("<h1 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>Datos de Ejemplo</h1>", unsafe_allow_html=True)
 else:
     st.markdown("<h1 style='text-align: center; color: #00cc66; background-color: #e6ffe6; padding: 10px; border-radius: 5px;'>Tus Datos</h1>", unsafe_allow_html=True)
 
-st.title("🔥 FORGE: GTR e Intraday")
+st.title("FORGE: Control de Gestion en Tiempo Real (GTR)")
 
-# Recuperar datos de CORTEX
+# 1. Recuperar datos
 df_acd = st.session_state.get('data_acd')
 
 if df_acd is not None:
-    st.subheader("Panel de Control Intraday")
-    
-    # Simulación de métricas de ejecución (Adherencia y Ausentismo)
-    # En un escenario real, esto vendría de un log de RRHH o Logins
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Adherencia Actual", "92%", "-2%")
-    with col2:
-        st.metric("Ausentismo", "8.5%", "1.2%", delta_color="inverse")
-    with col3:
-        # Ocupación calculada: (Llamadas * TMO) / Tiempo disponible (simulado)
-        st.metric("Ocupación", "84%", "5%")
-    with col4:
-        # Calculamos el desvío de llamadas vs lo esperado
-        st.metric("Desvío Staffing", "-3 HC", delta_color="inverse")
+    # --- FILTRO MAESTRO DE PCRC ---
+    pcrcs = ["Todos"] + list(df_acd['pcrc'].unique())
+    pcrc_sel = st.selectbox("Seleccione PCRC para Monitoreo GTR:", pcrcs)
 
-    st.divider()
-
-    # Visualización de Alertas GTR
-    st.subheader("Alertas de Desvío en Tiempo Real")
-    
-    # Lógica de alertas basada en datos de CORTEX
-    tasa_abandono = (df_acd['abandono'].sum() / len(df_acd)) * 100
-    
-    if tasa_abandono > 5:
-        st.error(f"🚨 CRÍTICO: Tasa de abandono en {tasa_abandono:.1f}%. Se requiere redistribución de carga inmediata.")
+    if pcrc_sel != "Todos":
+        df = df_acd[df_acd['pcrc'] == pcrc_sel].copy()
     else:
-        st.success("✅ Operación estable: Niveles de servicio dentro del umbral.")
+        df = df_acd.copy()
 
-    # Tabla de Adherencia por Site (Simulada con los sites de CORTEX)
-    st.subheader("Cumplimiento por Site")
-    sites = df_acd['site'].unique()
-    data_cumplimiento = pd.DataFrame({
-        'Site': sites,
-        'Logueados': [np.random.randint(10, 50) for _ in sites],
-        'Break/Almuerzo': [np.random.randint(1, 5) for _ in sites],
-        'Adherencia %': [np.random.randint(85, 98) for _ in sites]
-    })
-    st.table(data_cumplimiento)
+    # --- CONFIGURACION DE UMBRALES (GTR) ---
+    # Definimos los targets segun el negocio
+    targets = {
+        "Ventas": {"tmo_max": 500, "SLA_min": 0.80},
+        "Atencion": {"tmo_max": 320, "SLA_min": 0.85},
+        "Soporte": {"tmo_max": 850, "SLA_min": 0.75},
+        "Retenciones": {"tmo_max": 550, "SLA_min": 0.80},
+        "Todos": {"tmo_max": 450, "SLA_min": 0.80}
+    }
+    limit = targets.get(pcrc_sel)
+
+    # --- PANEL DE ALARMAS ---
+    st.divider()
+    tmo_actual = df['tmo_segundos'].mean()
+    nivel_servicio = 1 - df['abandono'].mean()
+
+    c1, c2, c3 = st.columns(3)
+    
+    # Alarma de TMO
+    if tmo_actual > limit["tmo_max"]:
+        c1.error(f"ALERTA TMO: {int(tmo_actual)}s (Excede {limit['tmo_max']}s)")
+    else:
+        c1.success(f"TMO Estable: {int(tmo_actual)}s")
+
+    # Alarma de Nivel de Servicio (SLA)
+    if nivel_servicio < limit["SLA_min"]:
+        c2.error(f"ALERTA SLA: {nivel_servicio*100:.1f}% (Bajo el {limit['SLA_min']*100}%)")
+    else:
+        c2.success(f"SLA Cumplido: {nivel_servicio*100:.1f}%")
+        
+    c3.metric("Llamadas en Proceso", len(df.tail(50)))
+
+    # --- GRAFICAS GTR ---
+    st.write("### Graficas de Control de Procesos")
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        # Heatmap de Abandono por Hora (Para detectar saturacion)
+        df['Hora'] = df['fecha'].dt.hour
+        df_error = df.groupby('Hora')['abandono'].mean().reset_index()
+        fig_error = px.bar(df_error, x='Hora', y='abandono', 
+                           title="Indice de Abandono por Intervalo",
+                           color='abandono', color_continuous_scale='Reds')
+        st.plotly_chart(fig_error, use_container_width=True)
+
+    with col_b:
+        # Grafica de Control de TMO (Evolucion Temporal)
+        df_tmo_t = df.resample('H', on='fecha')['tmo_segundos'].mean().reset_index()
+        fig_tmo = px.line(df_tmo_t, x='fecha', y='tmo_segundos', title="Evolucion del TMO por Hora")
+        fig_tmo.add_hline(y=limit["tmo_max"], line_dash="dash", line_color="red", annotation_text="Limite Operativo")
+        st.plotly_chart(fig_tmo, use_container_width=True)
+
+    # --- SUGERENCIAS DE ACCION GTR ---
+    st.divider()
+    with st.expander("Sugerencias de Accion Inmediata"):
+        if tmo_actual > limit["tmo_max"]:
+            st.warning("⚠️ Accion: Activar protocolo de llamadas cortas. Revisar si hay incidencias tecnicas masivas.")
+        if nivel_servicio < limit["SLA_min"]:
+            st.warning("⚠️ Accion: Restringir descansos/capacitaciones. Solicitar apoyo de personal administrativo a linea.")
+        if tmo_actual <= limit["tmo_max"] and nivel_servicio >= limit["SLA_min"]:
+            st.success("✅ Accion: Operacion en verde. Mantener monitoreo preventivo.")
 
 else:
-    st.warning("No hay datos operativos. Regresa a CORTEX para cargar información.")
+    st.error("No hay datos cargados en CORTEX para el monitoreo GTR.")
