@@ -11,76 +11,89 @@ if st.session_state.get('usando_datos_ejemplo', True):
 else:
     st.markdown("<h1 style='text-align: center; color: #00cc66; background-color: #e6ffe6; padding: 10px; border-radius: 5px;'>Tus Datos</h1>", unsafe_allow_html=True)
 
-st.title("🧭 ATLAS: Consolidacion Ejecutiva")
+st.title("ATLAS: Resumen Ejecutivo y Estrategia VMO")
 
-# Recuperar datos
+# 1. Recuperar datos consolidados
 df_acd = st.session_state.get('data_acd')
 df_qa = st.session_state.get('data_qa')
 df_cx = st.session_state.get('data_cx')
 
 if df_acd is not None:
-    # --- FILTROS DE ESTRATEGIA ---
-    st.sidebar.header("Filtros Estratégicos")
-    lista_pcrc = ["Todos"] + list(df_acd['pcrc'].unique())
-    pcrc_sel = st.sidebar.selectbox("Analizar PCRC", lista_pcrc)
-    
-    # Filtrado lógico
-    if pcrc_sel != "Todos":
-        df_acd_f = df_acd[df_acd['pcrc'] == pcrc_sel].copy()
-        ids_validos = df_acd_f['id_llamada']
-        df_qa_f = df_qa[df_qa['id_llamada'].isin(ids_validos)].copy() if df_qa is not None else None
-        df_cx_f = df_cx[df_cx['id_llamada'].isin(ids_validos)].copy() if df_cx is not None else None
-    else:
-        df_acd_f, df_qa_f, df_cx_f = df_acd.copy(), df_qa.copy(), df_cx.copy()
+    # --- FILTROS EJECUTIVOS EN SIDEBAR ---
+    with st.sidebar:
+        st.header("Filtros de Estrategia")
+        
+        # Filtro de PCRC (Multiselect)
+        opciones_pcrc = list(df_acd['pcrc'].unique())
+        pcrc_sel = st.multiselect("Seleccione PCRC(s):", opciones_pcrc, default=opciones_pcrc)
+        
+        # Filtro de Sitio (Multiselect)
+        opciones_site = list(df_acd['site'].unique())
+        site_sel = st.multiselect("Seleccione Sitio(s):", opciones_site, default=opciones_site)
 
-    # 1. Scorecard Ejecutivo (WBR)
-    st.subheader(f"Resumen de Desempeño: {pcrc_sel}")
+    # Aplicacion de filtros cruzados
+    df_f = df_acd[(df_acd['pcrc'].isin(pcrc_sel)) & (df_acd['site'].isin(site_sel))].copy()
+    
+    # Filtrar QA y CX basados en la seleccion de ACD
+    ids_filtrados = df_f['id_llamada']
+    df_qa_f = df_qa[df_qa['id_llamada'].isin(ids_filtrados)] if df_qa is not None else pd.DataFrame()
+    df_cx_f = df_cx[df_cx['id_llamada'].isin(ids_filtrados)] if df_cx is not None else pd.DataFrame()
+
+    # --- VISTA 1: METRICAS CLAVE (KPIs) ---
+    st.divider()
     c1, c2, c3, c4 = st.columns(4)
     
-    c1.metric("Volumen Total", f"{len(df_acd_f)} lls")
-    
-    if df_qa_f is not None and not df_qa_f.empty:
-        c2.metric("Calidad Promedio", f"{df_qa_f['nota_final'].mean():.1f}%")
-    
-    if df_cx_f is not None and not df_cx_f.empty:
-        c3.metric("CSAT (Experiencia)", f"{df_cx_f['csat'].mean():.2f}")
-        
-    c4.metric("Indice Eficiencia (50/75)", "74%", "+1.5%")
+    volumen = len(df_f)
+    tmo_avg = df_f['tmo_segundos'].mean() if volumen > 0 else 0
+    nota_qa = df_qa_f['nota_final'].mean() if not df_qa_f.empty else 0
+    csat_avg = df_cx_f['csat'].mean() if not df_cx_f.empty else 0
 
-    st.divider()
+    c1.metric("Volumen Total", f"{volumen:,}")
+    c2.metric("TMO Promedio", f"{int(tmo_avg)}s")
+    c3.metric("Calidad (QA)", f"{nota_qa:.1f}%")
+    c4.metric("Satisfaccion (CSAT)", f"{csat_avg:.2f}/5")
 
-    # 2. Análisis de Tendencia Histórica (2 Meses)
-    st.subheader("Evolución Histórica (Últimas 8 Semanas)")
-    
-    df_acd_f['fecha'] = pd.to_datetime(df_acd_f['fecha'])
-    df_acd_f['Semana'] = df_acd_f['fecha'].dt.isocalendar().week
-    
-    # Agrupar por semana para ver tendencia
-    tendencia = df_acd_f.groupby('Semana').size().reset_index(name='Llamadas')
-    fig_trend = px.line(tendencia, x='Semana', y='Llamadas', title="Tendencia de Volumen Semanal", markers=True)
-    st.plotly_chart(fig_trend, use_container_width=True)
+    # --- VISTA 2: ANALISIS COMPARATIVO ---
+    st.write("### Desempeño por Atributo")
+    col_a, col_b = st.columns(2)
 
-    # 3. Cuadrante de Priorización por Site
-    st.subheader("Matriz de Priorización por Site")
-    col_a, col_b = st.columns([2, 1])
-    
     with col_a:
-        # Generar data de comparación por site
-        sites = df_acd_f['site'].unique()
-        data_sites = pd.DataFrame({
-            'Site': sites,
-            'Productividad': [np.random.randint(70, 95) for _ in sites],
-            'Calidad': [np.random.randint(80, 100) for _ in sites]
-        })
-        fig_scatter = px.scatter(data_sites, x='Productividad', y='Calidad', text='Site', 
-                                 size=[20]*len(sites), color='Site', title="Eficiencia vs Calidad")
-        st.plotly_chart(fig_scatter, use_container_width=True)
-        
+        # Comparativa de Volumen por Sitio
+        fig_site = px.bar(df_f.groupby('site').size().reset_index(name='Llamadas'), 
+                          x='site', y='Llamadas', title="Distribucion de Carga por Sitio",
+                          color='site', color_discrete_sequence=px.colors.qualitative.Safe)
+        st.plotly_chart(fig_site, use_container_width=True)
+
     with col_b:
-        st.info("**Estrategia VMO:**")
-        st.write(f"Para el PCRC **{pcrc_sel}**, se observa que el site con menor desempeño requiere auditoría de procesos en el módulo BLUEPRINT.")
-        if st.button("Generar MBR Mensual"):
-            st.success("Reporte consolidado de 60 días generado.")
+        # Relacion Calidad vs TMO por PCRC
+        if not df_qa_f.empty:
+            df_merged = df_f.merge(df_qa_f, on='id_llamada')
+            df_scatter = df_merged.groupby('pcrc').agg({'tmo_segundos':'mean', 'nota_final':'mean'}).reset_index()
+            fig_scat = px.scatter(df_scatter, x='tmo_segundos', y='nota_final', text='pcrc', 
+                                  size='tmo_segundos', color='pcrc',
+                                  title="Matriz Eficiencia (TMO) vs Calidad (QA)")
+            st.plotly_chart(fig_scat, use_container_width=True)
+
+    # --- VISTA 3: TENDENCIA TEMPORAL ---
+    st.write("### Evolucion del CSAT por PCRC")
+    if not df_cx_f.empty:
+        df_cx_trend = df_f.merge(df_cx_f, on='id_llamada')
+        df_cx_trend['fecha_d'] = df_cx_trend['fecha'].dt.date
+        trend_data = df_cx_trend.groupby(['fecha_d', 'pcrc'])['csat'].mean().reset_index()
+        fig_trend = px.line(trend_data, x='fecha_d', y='csat', color='pcrc', markers=True,
+                            title="Tendencia de Satisfaccion Diaria")
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+    # --- VISTA 4: INSIGHTS ESTRATEGICOS ---
+    st.divider()
+    st.subheader("Sugerencias del Agente ATLAS")
+    
+    if nota_qa < 85:
+        st.error(f"Alerta: La calidad general ({nota_qa:.1f}%) esta por debajo del target del 85%. Se recomienda revisar planes de coaching en los sitios seleccionados.")
+    if tmo_avg > 500:
+        st.warning(f"Atencion: El TMO actual de {int(tmo_avg)}s impacta la disponibilidad. Revisar procesos de soporte tecnico.")
+    else:
+        st.success("La operacion se mantiene dentro de los parametros de eficiencia esperados.")
 
 else:
-    st.warning("No hay datos cargados. Ve a CORTEX para generar el ecosistema de 2 meses.")
+    st.error("Por favor, poblar el sistema en CORTEX para generar el analisis estrategico.")
