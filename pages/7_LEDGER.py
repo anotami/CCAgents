@@ -12,85 +12,95 @@ else:
 
 st.title("LEDGER: Auditoria y Liquidacion Financiera")
 
-# 1. Recuperar datos de todos los agentes
+# 1. Recuperar datos
 df_acd = st.session_state.get('data_acd')
 df_qa = st.session_state.get('data_qa')
 
 if df_acd is not None:
-    # --- CONFIGURACION DE TARIFAS POR PCRC ---
-    tarifas = {
-        "Ventas": {"hora": 18.5, "bono_qa": 500, "penalidad_rac": 50},
-        "Atencion": {"hora": 13.0, "bono_qa": 300, "penalidad_rac": 30},
-        "Soporte": {"hora": 21.0, "bono_qa": 400, "penalidad_rac": 100},
-        "Retenciones": {"hora": 19.5, "bono_qa": 600, "penalidad_rac": 80}
-    }
+    # --- PANEL DE CRITERIOS (EDITABLE) ---
+    with st.sidebar:
+        st.header("Criterios de Contrato")
+        st.write("Ajusta los valores para el calculo del mes:")
+        
+        # Diccionario base de tarifas por PCRC
+        tarifas_base = {
+            "Ventas": {"hora": 18.5, "bono": 500.0, "multa": 50.0},
+            "Atencion": {"hora": 13.0, "bono": 300.0, "multa": 30.0},
+            "Soporte": {"hora": 21.0, "bono": 400.0, "multa": 100.0},
+            "Retenciones": {"hora": 19.5, "bono": 600.0, "multa": 80.0}
+        }
+        
+        pcrc_sel = st.selectbox("PCRC a Liquidar:", list(df_acd['pcrc'].unique()))
+        
+        # Inputs editables cargados con la base del PCRC seleccionado
+        base = tarifas_base.get(pcrc_sel)
+        val_hora = st.number_input("Tarifa USD/Hora", value=base["hora"])
+        val_bono = st.number_input("Bono por Calidad (>90%)", value=base["bono"])
+        val_multa = st.number_input("Multa por Error Critico (RAC)", value=base["multa"])
 
-    # FILTRO MAESTRO
-    pcrc_sel = st.selectbox("Seleccione PCRC para Liquidacion:", list(df_acd['pcrc'].unique()))
-    conf = tarifas.get(pcrc_sel)
-
-    # Filtrado de datos correlacionados
+    # --- LOGICA DE CALCULOS ---
     df_f = df_acd[df_acd['pcrc'] == pcrc_sel].copy()
+    
+    # Horas y Monto Base
+    horas_facturables = df_f['tmo_segundos'].sum() / 3600
+    monto_base = horas_facturables * val_hora
+    
+    # Calculo de Incentivos y Penalidades usando los datos de QA
+    incentivos = 0.0
+    penalidades = 0.0
+    nota_avg = 0.0
+    rac_count = 0
+
     if df_qa is not None:
         df_qa_f = df_qa[df_qa['id_llamada'].isin(df_f['id_llamada'])]
-    else:
-        df_qa_f = pd.DataFrame()
+        if not df_qa_f.empty:
+            nota_avg = df_qa_f['nota_final'].mean()
+            rac_count = len(df_qa_f[df_qa_f['error_critico'] == 'Si'])
+            
+            # Aplicacion de criterios
+            if nota_avg >= 90:
+                incentivos = val_bono
+            penalidades = rac_count * val_multa
 
-    # --- CALCULOS CORE ---
-    horas_facturables = df_f['tmo_segundos'].sum() / 3600
-    monto_base = horas_facturables * conf["hora"]
-    
-    # Calculo de Ajustes (Bonos y Multas)
-    multas = 0
-    bonos = 0
-    if not df_qa_f.empty:
-        rac_count = len(df_qa_f[df_qa_f['error_critico'] == 'Si'])
-        multas = rac_count * conf["penalidad_rac"]
-        if df_qa_f['nota_final'].mean() > 90:
-            bonos = conf["bono_qa"]
+    total_liquidar = monto_base + incentivos - penalidades
 
-    total_final = monto_base + bonos - multas
+    # --- VISTA DE CRITERIOS APLICADOS ---
+    st.info(f"**Criterios Aplicados para {pcrc_sel}:** Tarifa USD {val_hora}/h | Bono si QA >= 90% | Penalidad USD {val_multa} por RAC.")
 
-    # --- VISTA 1: SCORECARD FINANCIERO ---
-    st.divider()
+    # --- SCORECARD ---
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Monto Base", f"USD {monto_base:,.2f}")
-    c2.metric("Bonos QA", f"USD {bonos:,.2f}", delta=f"{bonos}", delta_color="normal")
-    c3.metric("Penalidades RAC", f"USD {multas:,.2f}", delta=f"-{multas}", delta_color="inverse")
-    c4.metric("Total a Liquidar", f"USD {total_final:,.2f}")
+    c1.metric("Monto Horas", f"USD {monto_base:,.2f}")
+    c2.metric("Incentivos", f"USD {incentivos:,.2f}", delta=f"QA: {nota_avg:.1f}%")
+    c3.metric("Penalidades", f"USD {penalidades:,.2f}", delta=f"RACs: {rac_count}", delta_color="inverse")
+    c4.metric("Total Liquidar", f"USD {total_liquidar:,.2f}")
 
-    # --- VISTA 2: GRAFICAS DE DISTRIBUCION ---
-    st.write("### Analisis de Costos y Desviaciones")
-    col_a, col_b = st.columns(2)
-
-    with col_a:
-        # Composicion del pago
-        df_pie = pd.DataFrame({
-            "Concepto": ["Base Operativa", "Incentivos", "Deducciones"],
-            "Valor": [monto_base, bonos, multas]
+    # --- GRAFICAS ---
+    st.divider()
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        # Composicion de la factura
+        df_comp = pd.DataFrame({
+            "Concepto": ["Base Operativa", "Bonos", "Multas"],
+            "Monto": [monto_base, incentivos, penalidades]
         })
-        fig_pie = px.pie(df_pie, names="Concepto", values="Valor", 
-                         title="Composicion de la Factura",
-                         color_discrete_map={"Base Operativa":"#1f77b4", "Incentivos":"#2ca02c", "Deducciones":"#d62728"})
+        fig_pie = px.pie(df_comp, names="Concepto", values="Monto", 
+                         title=f"Distribucion de Costos: {pcrc_sel}",
+                         color_discrete_map={"Base Operativa":"#1f77b4", "Bonos":"#2ca02c", "Multas":"#d62728"})
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    with col_b:
-        # Tendencia de costo por llamada (CPH)
-        df_f['fecha_d'] = pd.to_datetime(df_f['fecha']).dt.date
-        cph_daily = df_f.groupby('fecha_d')['tmo_segundos'].mean() * (conf["hora"]/3600)
-        fig_cph = px.line(x=cph_daily.index, y=cph_daily.values, 
-                          title="Costo Promedio por Llamada (Tendencia)",
-                          labels={'x': 'Fecha', 'y': 'USD per Call'})
-        st.plotly_chart(fig_cph, use_container_width=True)
-
-    # --- VISTA 3: TABLA DE AUDITORIA ---
-    with st.expander("Ver Detalle de Auditoria para Facturacion"):
-        st.write("Llamadas con Error Critico (RAC) que generaron penalidad:")
-        if not df_qa_f.empty:
-            rac_detail = df_qa_f[df_qa_f['error_critico'] == 'Si']
-            st.dataframe(rac_detail, width='stretch')
+    with col_right:
+        # Comparativa de CPH (Costo por Hora Real vs Pactada)
+        st.write("### Auditoria de Cumplimiento")
+        st.write(f"Para el negocio de **{pcrc_sel}**, se han auditado **{len(df_qa_f) if df_qa is not None else 0}** llamadas.")
+        if rac_count > 0:
+            st.warning(f"Se han detectado {rac_count} errores criticos que impactan en -USD {penalidades:,.2f}")
         else:
-            st.success("No se detectaron penalidades en este periodo.")
+            st.success("Operacion limpia de errores criticos en la muestra seleccionada.")
+
+    # Tabla de detalle para transparencia
+    with st.expander("Ver detalle de calculo por llamada"):
+        st.dataframe(df_f[['fecha', 'id_llamada', 'tmo_segundos', 'site']].head(20), width='stretch')
 
 else:
-    st.error("No hay datos para liquidar. Ve a CORTEX.")
+    st.error("Por favor, genera datos en CORTEX para visualizar la liquidacion.")
