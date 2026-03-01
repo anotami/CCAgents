@@ -21,9 +21,9 @@ perfiles = {
     "Retenciones": {"vol": 0.10, "tmo": 500, "tmo_std": 120, "qa": 88, "csat": [0.1, 0.1, 0.2, 0.3, 0.3], "curva": "comercial"}
 }
 
-if st.button("Generar Ecosistema Diferenciado (60 Dias)"):
+if st.button("Generar Ecosistema Diferenciado (180 Dias)"):
     st.session_state.usando_datos_ejemplo = True
-    dias = 60
+    dias = 180
     total_registros = 6000
     fecha_ini = datetime.now() - timedelta(days=dias)
     
