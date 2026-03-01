@@ -17,7 +17,7 @@ st.title("CORTEX: Generacion de Ecosistema Telco")
 pcrcs = ["Ventas", "Atencion", "Soporte", "Retenciones"]
 sites = ["Lima", "Cordoba", "Remoto"]
 
-if st.button("Generar Datos Reales (60 Dias)"):
+if st.button("Generar Datos Reales (180 Dias)"):
     st.session_state.usando_datos_ejemplo = True
     
     # 1. Definir volumen base con estacionalidad horaria
