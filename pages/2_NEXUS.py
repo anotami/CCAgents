@@ -5,7 +5,7 @@ import plotly.express as px
 
 st.set_page_config(page_title="NEXUS | Capacidad", layout="wide")
 
-# Banner de estado
+# Banner de estado persistente
 if st.session_state.get('usando_datos_ejemplo', True):
     st.markdown("<h1 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>Datos de Ejemplo</h1>", unsafe_allow_html=True)
 else:
@@ -19,10 +19,12 @@ df_acd = st.session_state.get('data_acd')
 if df_acd is not None:
     # Preparacion de datos
     df_acd['fecha'] = pd.to_datetime(df_acd['fecha'])
+    dias_orden = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    dias_es = {'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mie', 'Thursday': 'Jue', 'Friday': 'Vie', 'Saturday': 'Sab', 'Sunday': 'Dom'}
     
-    # --- SELECCION DE PCRC (ARRIBA) ---
-    pcrcs = ["Todos"] + list(df_acd['pcrc'].unique())
-    pcrc_sel = st.selectbox("Seleccione el PCRC a analizar:", pcrcs)
+    # --- SELECCION DE PCRC (SUPERIOR) ---
+    lista_pcrc = ["Todos"] + list(df_acd['pcrc'].unique())
+    pcrc_sel = st.selectbox("Seleccione el PCRC a analizar:", lista_pcrc)
     
     if pcrc_sel != "Todos":
         df = df_acd[df_acd['pcrc'] == pcrc_sel].copy()
@@ -31,10 +33,8 @@ if df_acd is not None:
 
     st.divider()
 
-    # --- FILAS DE GRAFICAS ---
-    # Fila 1: Mensual y Semanal
+    # --- FILA 1: VOLUMEN MENSUAL Y SEMANAL ---
     col1, col2 = st.columns(2)
-    
     with col1:
         st.subheader("Vista Mensual")
         df_mensual = df.resample('M', on='fecha').size().reset_index(name='Llamadas')
@@ -49,29 +49,35 @@ if df_acd is not None:
         fig_sem = px.line(df_semanal, x='Semana', y='Llamadas', markers=True)
         st.plotly_chart(fig_sem, use_container_width=True)
 
-    # Fila 2: Diaria e Intervalo
+    # --- FILA 2: VOLUMEN POR DIA Y TMO POR DIA ---
     col3, col4 = st.columns(2)
-    
     with col3:
-        st.subheader("Vista Diaria (Ultimos 30 dias)")
-        df_diario = df.resample('D', on='fecha').size().reset_index(name='Llamadas')
-        fig_dia = px.area(df_diario.tail(30), x='fecha', y='Llamadas')
-        st.plotly_chart(fig_dia, use_container_width=True)
+        st.subheader("Distribucion Volumen por Dia")
+        df['Dia_Nombre'] = df['fecha'].dt.day_name()
+        df_vol_dia = df.groupby('Dia_Nombre').size().reindex(dias_orden).reset_index(name='Llamadas')
+        df_vol_dia['Dia'] = df_vol_dia['Dia_Nombre'].map(dias_es)
+        fig_vol_dia = px.bar(df_vol_dia, x='Dia', y='Llamadas', color='Llamadas', color_continuous_scale='Blues')
+        st.plotly_chart(fig_vol_dia, use_container_width=True)
 
     with col4:
-        st.subheader("Distribucion por Intervalo (Hora)")
-        # Agrupamos por hora del dia para ver el comportamiento promedio del intervalo
-        df['Hora'] = df['fecha'].dt.hour
-        df_intervalo = df.groupby('Hora').size().reset_index(name='Llamadas')
-        fig_int = px.bar(df_intervalo, x='Hora', y='Llamadas', color='Llamadas', color_continuous_scale='Viridis')
-        st.plotly_chart(fig_int, use_container_width=True)
+        st.subheader("TMO Promedio por Dia (Segundos)")
+        df_tmo_dia = df.groupby('Dia_Nombre')['tmo_segundos'].mean().reindex(dias_orden).reset_index(name='TMO')
+        df_tmo_dia['Dia'] = df_tmo_dia['Dia_Nombre'].map(dias_es)
+        fig_tmo_dia = px.line(df_tmo_dia, x='Dia', y='TMO', markers=True, color_discrete_sequence=['#ff7f0e'])
+        st.plotly_chart(fig_tmo_dia, use_container_width=True)
 
-    # --- ANALISIS DE CARGA ---
+    # --- FILA 3: VISTA POR INTERVALO ---
+    st.subheader("Curva de Arribo por Intervalo (Hora)")
+    df['Hora'] = df['fecha'].dt.hour
+    df_intervalo = df.groupby('Hora').size().reset_index(name='Llamadas')
+    fig_int = px.bar(df_intervalo, x='Hora', y='Llamadas', color='Llamadas', color_continuous_scale='Viridis')
+    st.plotly_chart(fig_int, use_container_width=True)
+
+    # --- RESUMEN OPERATIVO ---
     st.divider()
     tmo_avg = df['tmo_segundos'].mean()
-    workload_total = (len(df) * tmo_avg) / 3600
-    
-    st.info(f"Analisis Final: Para el PCRC {pcrc_sel}, el volumen procesado representa {workload_total:.1f} horas de conexion neta con un TMO promedio de {int(tmo_avg)} segundos.")
+    workload_hrs = (len(df) * tmo_avg) / 3600
+    st.info(f"Reporte NEXUS para {pcrc_sel}: Carga de trabajo de {workload_hrs:.1f} horas netas. El TMO promedio general es de {int(tmo_avg)} segundos.")
 
 else:
-    st.warning("No hay datos cargados. Por favor, ve a CORTEX y genera el entorno de 2 meses.")
+    st.warning("No hay datos cargados. Por favor, ve a CORTEX y genera el ecosistema de 2 meses.")
