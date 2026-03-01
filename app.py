@@ -36,6 +36,5 @@ if st.session_state.usando_datos_ejemplo:
 
 with col_img:
     # Imagen alusiva a centros de datos y operaciones
-   
     st.image("https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", 
              caption="Operaciones Inteligentes VMO")
