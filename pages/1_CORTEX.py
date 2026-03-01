@@ -21,8 +21,8 @@ if st.button("Generar Datos Reales (60 Dias)"):
     st.session_state.usando_datos_ejemplo = True
     
     # 1. Definir volumen base con estacionalidad horaria
-    dias = 60
-    registros_aprox = 5000 
+    dias = 180
+    registros_aprox = 50000 
     fecha_fin = datetime.now()
     fecha_ini = fecha_fin - timedelta(days=dias)
     
