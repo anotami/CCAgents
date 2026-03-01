@@ -2,7 +2,7 @@ import streamlit as st
 
 # 1. Configuración de página (Debe ser lo primero)
 st.set_page_config(
-    page_title="VMO AI | COPC R8.0",
+    page_title="CCAgents AI | FTDStudio",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
