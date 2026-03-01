@@ -13,11 +13,12 @@ if 'usando_datos_ejemplo' not in st.session_state:
     st.session_state.usando_datos_ejemplo = True
 
 with st.sidebar:
-    st.title("Configuración")
+    st.title("⚙️ Configuración")
     # Toggle para cambiar entre datos de prueba y reales
     modo_datos = st.toggle("Activar Mis Datos", value=not st.session_state.usando_datos_ejemplo)
     st.session_state.usando_datos_ejemplo = not modo_datos
     st.divider()
+    st.write("Versión 1.2.0 - VMO OS")
 
 # 3. Banner Visual de Estado
 if st.session_state.usando_datos_ejemplo:
@@ -38,13 +39,13 @@ with col_main:
     calidad y experiencia del cliente.
 
     ### Instrucciones Rápidas:
-    1. Ve al módulo **CORTEX** para poblar el sistema con 2 meses de datos.
+    1. Ve al módulo **🧠 CORTEX** para poblar el sistema con 2 meses de datos.
     2. Navega por los módulos para ver el impacto en **Capacidad, Calidad y Finanzas**.
-    3. Toma decisiones estratégicas en el módulo **ATLAS**.
+    3. Toma decisiones estratégicas en el módulo **🧭 ATLAS**.
     """)
+    st.info("💡 Tip: Si los datos no cargan en los módulos, regresa a CORTEX y pulsa el botón de Generar Datos.")
 
 with col_img:
     # Imagen alusiva a centros de datos y operaciones
-    
-
-st.info("💡 Tip: Si los datos no cargan en los módulos, regresa a CORTEX y pulsa el botón de Generar Datos.")
+    st.image("https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", 
+             caption="Operaciones Inteligentes VMO")
