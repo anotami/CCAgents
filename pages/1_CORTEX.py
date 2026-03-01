@@ -6,78 +6,83 @@ import io
 
 st.set_page_config(page_title="CORTEX | Ingesta", layout="wide")
 
-# Banner de estado de datos
+# Banner de estado persistente
 if st.session_state.get('usando_datos_ejemplo', True):
     st.markdown("<h1 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>Datos de Ejemplo</h1>", unsafe_allow_html=True)
 else:
     st.markdown("<h1 style='text-align: center; color: #00cc66; background-color: #e6ffe6; padding: 10px; border-radius: 5px;'>Tus Datos</h1>", unsafe_allow_html=True)
 
-st.title("🧠 CORTEX: Ingesta y Validación")
+st.title("CORTEX: Ingesta y Validacion")
 
-# --- SECCIÓN 1: DOCUMENTACIÓN DE FUENTES ---
-with st.expander("Requerimientos de Información por Fuente", expanded=False):
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        st.markdown("**1. ACD (Telefonía)**")
-        st.write("- fecha (YYYY-MM-DD HH:MM)\n- id_llamada\n- site\n- tmo_segundos\n- hold_segundos\n- abandono (0/1)")
-    with col_b:
-        st.markdown("**2. QA (Calidad)**")
-        st.write("- id_llamada\n- evaluador\n- nota_final (0-100)\n- error_critico (Si/No)\n- feedback_coaching (Texto)")
-    with col_c:
-        st.markdown("**3. CRM/CX (Experiencia)**")
-        st.write("- id_llamada\n- csat (1-5)\n- motivo_contacto\n- sentimiento (Pos/Neu/Neg)")
+# --- SECCION 1: DOCUMENTACION DE FUENTES ---
+st.subheader("Fuentes de Informacion Requeridas")
+col_info1, col_info2, col_info3 = st.columns(3)
 
-# --- SECCIÓN 2: GENERADOR DE DATOS DE EJEMPLO ---
-st.subheader("Generar Casos de Ejemplo")
-col_gen1, col_gen2 = st.columns([1, 3])
-
-with col_gen1:
-    tipo_fuente = st.selectbox("Selecciona Fuente", ["ACD", "QA", "CX"])
-    filas = st.slider("Número de filas", 10, 500, 100)
-    
-if st.button("Generar y Cargar Datos de Prueba"):
-    st.session_state.usando_datos_ejemplo = True
-    
-    # Lógica de generación en memoria para Streamlit Cloud
-    output = io.BytesIO()
-    inicio = datetime.now() - timedelta(days=7)
-    
-    if tipo_fuente == "ACD":
-        df_gen = pd.DataFrame({
-            'fecha': [(inicio + timedelta(minutes=i*30)).strftime('%Y-%m-%d %H:%M') for i in range(filas)],
-            'id_llamada': [f"CALL-{2000+i}" for i in range(filas)],
-            'site': np.random.choice(['Lima', 'Cordoba', 'Remoto'], filas),
-            'tmo_segundos': np.random.randint(180, 600, filas),
-            'hold_segundos': np.random.randint(10, 60, filas),
-            'abandono': np.random.choice([0, 1], filas, p=[0.9, 0.1])
-        })
-    elif tipo_fuente == "QA":
-        df_gen = pd.DataFrame({
-            'id_llamada': [f"CALL-{2000+i}" for i in range(filas)],
-            'evaluador': np.random.choice(['Supervisor A', 'Supervisor B'], filas),
-            'nota_final': np.random.randint(70, 100, filas),
-            'error_critico': np.random.choice(['No', 'Si'], filas, p=[0.95, 0.05])
-        })
-    else: # CX
-        df_gen = pd.DataFrame({
-            'id_llamada': [f"CALL-{2000+i}" for i in range(filas)],
-            'csat': np.random.randint(1, 6, filas),
-            'sentimiento': np.random.choice(['Positivo', 'Neutral', 'Negativo'], filas)
-        })
-
-    st.session_state[f'data_{tipo_fuente.lower()}'] = df_gen
-    st.success(f"Datos de {tipo_fuente} generados y cargados en memoria.")
-    st.dataframe(df_gen.head(5), use_container_width=True)
+with col_info1:
+    st.info("**1. ACD (Telefonia)**\n\nCampos: fecha, id_llamada, site, tmo_segundos, hold_segundos, abandono (0/1)")
+with col_info2:
+    st.info("**2. QA (Calidad)**\n\nCampos: id_llamada, evaluador, nota_final (0-100), error_critico (Si/No)")
+with col_info3:
+    st.info("**3. CX (Experiencia)**\n\nCampos: id_llamada, csat (1-5), sentimiento (Positivo/Negativo)")
 
 st.divider()
 
-# --- SECCIÓN 3: CARGA DE ARCHIVOS REALES ---
-st.subheader("Carga de Archivos Reales")
-archivo_real = st.file_uploader("Sube tu archivo .csv", type=['csv'])
+# --- SECCION 2: GENERADOR E INGESTA ---
+col_gen, col_up = st.columns(2)
 
-if archivo_real:
-    st.session_state.usando_datos_ejemplo = False
-    df_real = pd.read_csv(archivo_real)
-    st.success("Tus datos han sido cargados. El banner ha cambiado a 'Tus Datos'.")
-    st.dataframe(df_real.head(5), use_container_width=True)
-    st.rerun()
+with col_gen:
+    st.subheader("Generar Casos de Ejemplo")
+    fuente_gen = st.selectbox("Selecciona fuente a simular", ["ACD", "QA", "CX"])
+    if st.button("Generar y Cargar Ejemplo"):
+        st.session_state.usando_datos_ejemplo = True
+        filas = 100
+        inicio = datetime.now()
+        
+        if fuente_gen == "ACD":
+            df = pd.DataFrame({
+                'fecha': [(inicio - timedelta(minutes=i*30)).strftime('%Y-%m-%d %H:%M') for i in range(filas)],
+                'id_llamada': [f"C-{1000+i}" for i in range(filas)],
+                'site': np.random.choice(['Lima', 'Cordoba'], filas),
+                'tmo_segundos': np.random.randint(200, 500, filas),
+                'hold_segundos': np.random.randint(10, 50, filas),
+                'abandono': np.random.choice([0, 1], filas, p=[0.9, 0.1])
+            })
+        elif fuente_gen == "QA":
+            df = pd.DataFrame({
+                'id_llamada': [f"C-{1000+i}" for i in range(filas)],
+                'evaluador': np.random.choice(['Sup_1', 'Sup_2'], filas),
+                'nota_final': np.random.randint(80, 100, filas),
+                'error_critico': np.random.choice(['No', 'Si'], filas, p=[0.9, 0.1])
+            })
+        else:
+            df = pd.DataFrame({
+                'id_llamada': [f"C-{1000+i}" for i in range(filas)],
+                'csat': np.random.randint(1, 6, filas),
+                'sentimiento': np.random.choice(['Positivo', 'Neutral', 'Negativo'], filas)
+            })
+        
+        st.session_state[f'data_{fuente_gen.lower()}'] = df
+        st.success(f"Datos de {fuente_gen} cargados en memoria")
+
+with col_up:
+    st.subheader("Cargar Datos Reales")
+    archivo = st.file_uploader("Sube tu archivo .csv", type=['csv'])
+    if archivo:
+        st.session_state.usando_datos_ejemplo = False
+        # Aqui podriamos agregar logica para detectar que fuente es segun columnas
+        df_real = pd.read_csv(archivo)
+        st.session_state['data_real'] = df_real
+        st.success("Datos reales cargados")
+        st.rerun()
+
+# --- SECCION 3: VISUALIZACION DE DATOS CARGADOS ---
+st.divider()
+st.subheader("Vista Previa de Datos en Sistema")
+fuentes_disponibles = [k for k in st.session_state.keys() if k.startswith('data_')]
+
+if fuentes_disponibles:
+    for f in fuentes_disponibles:
+        st.write(f"Dataset: **{f.replace('data_', '').upper()}**")
+        st.dataframe(st.session_state[f].head(5), use_container_width=True)
+else:
+    st.warning("No hay datos cargados todavia. Usa el generador o sube un archivo.")
