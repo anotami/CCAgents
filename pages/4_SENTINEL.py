@@ -3,6 +3,20 @@ import pandas as pd
 
 st.set_page_config(page_title="SENTINEL | Calidad", layout="wide")
 
+# Obtener PCRCs únicos del ACD para filtrar
+if 'data_acd' in st.session_state:
+    lista_pcrc = ["Todos"] + list(st.session_state['data_acd']['pcrc'].unique())
+    pcrc_sel = st.sidebar.selectbox("Filtrar por PCRC", lista_pcrc)
+    
+    # Filtrar el DF de la página actual (ejemplo para QA)
+    if pcrc_sel != "Todos":
+        # Primero filtramos el ACD para obtener los IDs de ese PCRC
+        ids_pcrc = st.session_state['data_acd'][st.session_state['data_acd']['pcrc'] == pcrc_sel]['id_llamada']
+        df_qa = st.session_state['data_qa'][st.session_state['data_qa']['id_llamada'].isin(ids_pcrc)]
+    else:
+        df_qa = st.session_state['data_qa']
+
+
 # Banner de estado persistente
 if st.session_state.get('usando_datos_ejemplo', True):
     st.markdown("<h1 style='text-align: center; color: #ff4b4b; background-color: #ffe6e6; padding: 10px; border-radius: 5px;'>Datos de Ejemplo</h1>", unsafe_allow_html=True)
